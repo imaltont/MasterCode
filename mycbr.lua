@@ -3,6 +3,7 @@ json = require"json"
 url = "http://localhost:8080"
 
 concept = "Megaman"
+--casebase = "MegamanCB2"
 casebase = "MegamanCB_Test"
 amal = "MegamanSim"
 

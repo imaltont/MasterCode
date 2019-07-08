@@ -152,13 +152,13 @@ function get_nn_map()
 		for j = 1,NUM_COLS do
 			tile_type = 0
 			if isWall(map[i][j]) then
-				tile_type = 2
+				tile_type = 20
 			end
 			if isFatal(map[i][j]) then
-				tile_type = 5
+				tile_type = 160
 			end
 			if isLadder(map[i][j]) then
-				tile_type = 3
+				tile_type = 30
 			end
             nn_map[i][j] = tile_type
 		end
@@ -181,20 +181,20 @@ function get_nn_map()
             elseif isEnemy(id) then
                 if(nn_map[sy]) then
                     if nn_map[sy][sx] then
-                        nn_map[sy][sx] = 6
+                        nn_map[sy][sx] = 150
                     end
                 end
             elseif not isEnemy() then
                 if(nn_map[sy]) then
                     if nn_map[sy][sx] then
-                        nn_map[sy][sx] = 4
+                        nn_map[sy][sx] = 50
                     end
                 end
             end
 		end
 	end
     if nn_map[my] and nn_map[my][mx] then
-        nn_map[my][mx] =nn_map[my][mx] + 7 
+        nn_map[my][mx] =nn_map[my][mx] + 100 
     end
     return nn_map
 end

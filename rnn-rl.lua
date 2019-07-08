@@ -14,7 +14,7 @@ function build_network(opts)
     local rnn = nn.Sequential()
     rnn:add(r)
     opts.hidden_sizes[0] = opts.hidden_sizes[1]
-    rnn:add(nn.ELU())
+    --rnn:add(nn.ELU())
     for i = 1, #opts.hidden_sizes do
         rnn:add(nn.Linear(opts.hidden_sizes[i-1], opts.hidden_sizes[i]))
         rnn:add(nn.ELU())
@@ -23,6 +23,8 @@ function build_network(opts)
     rnn:add(nn.Linear(opts.hidden_sizes[#opts.hidden_sizes], #opts.actions))
 
     rnn = nn.Sequencer(rnn)
+
+    rnn:remember("eval")
 
     local criterion = nn.SequencerCriterion(nn.MSECriterion())
     
@@ -48,23 +50,24 @@ function get_q_update(state, action, reward, state2, terminal, network, target_n
 
     delta = r:clone():add(q2)
 
-    local q_all = network:forward(s)--:clone()
+    --local q_all = network:forward(s)--:clone()
 
-    targets = torch.zeros(q_all:size(1), q_all:size(2), q_all:size(3)):add(q_all)
+    --targets = torch.zeros(q_all:size(1), q_all:size(2), q_all:size(3)):add(q_all)
 
-    for i = 1, state:size(1) do
-        for j = 1, state:size(2) do
-            targets[i][j][a[i][j]] = delta[i][j] 
-        end
-    end
+    --for i = 1, state:size(1) do
+    --    for j = 1, state:size(2) do
+    --        targets[i][j][a[i][j]] = delta[i][j] 
+    --    end
+    --end
 
-    return targets
+    --return targets
+    return delta
 end
 
 function q_learn_batch(batch, state2, actions, rewards, terminal, learning_rate, discount, network, target_network, criterion, epoch, iteration)
     local targets = get_q_update(batch, actions, rewards, state2, terminal, network, target_network, discount)
 
-    training_step(network, criterion, batch, targets, learning_rate, iteration, epoch)
+    training_step(network, criterion, batch, targets, actions, learning_rate, iteration, epoch)
 
     return network
 end
@@ -77,7 +80,7 @@ function generate_batches(inputs, batch_size, num_recurrent)
     local actions = {}
     local terminal = {}
     local terminal_func = function(term) if term then return 1 else return 0 end end
-    local last_batch = math.floor(batch_size / 2)
+    local last_batch = 1 --math.floor(batch_size / 2)
     for i = 1, num_recurrent do
         rewards[i] = {}
         inp_tensor[i] = {}
@@ -86,33 +89,26 @@ function generate_batches(inputs, batch_size, num_recurrent)
         terminal[i] = {}
     end
     for i = 1, last_batch do
-        local terminated = false
-        for j = num_recurrent, 1, -1 do
-            rewards[j][#rewards[j]+1] = inputs[i+(j-1)].reward
-            inp_tensor[j][#inp_tensor[j]+1] = inputs[i+(j-1)].state
-            actions[j][#actions[j]+1] = inputs[i+(j-1)].action
-            state2[j][#state2[j]+1] = inputs[i+(j-1)].state2
-            terminal[j][#terminal[j]+1] = terminal_func(inputs[i+(j-1)].terminal)
-        end
-
+            rewards[i] = inputs[i].rewards
+            inp_tensor[i] = inputs[i].states
+            actions[i] = inputs[i].actions
+            state2[i] = inputs[i].state2s
+            terminal[i] = inputs[i].terminals
     end
     for i = last_batch+1, batch_size do
         local ind = math.random(1, #inputs-num_recurrent)
         local terminated = false
-        for j = 1, num_recurrent do
-            rewards[j][#rewards[j]+1] = inputs[i+(j-1)].reward
-            inp_tensor[j][#inp_tensor[j]+1] = inputs[i+(j-1)].state
-            actions[j][#actions[j]+1] = inputs[i+(j-1)].action
-            state2[j][#state2[j]+1] = inputs[i+(j-1)].state2
-            terminal[j][#terminal[j]+1] = terminal_func(inputs[i+(j-1)].terminal)
-        end
-
+        rewards[i] = inputs[ind].rewards
+        inp_tensor[i] = inputs[ind].states
+        actions[i] = inputs[ind].actions
+        state2[i] = inputs[ind].state2s
+        terminal[i] = inputs[ind].terminals
     end
-    inp_tensor = torch.CudaTensor(inp_tensor)
-    state2 = torch.CudaTensor(state2)
-    actions = torch.FloatTensor(actions)
-    rewards = torch.FloatTensor(rewards)
-    terminal = torch.FloatTensor(terminal)
+    inp_tensor = torch.cat(inp_tensor, 2):cuda()
+    state2 = torch.cat(state2, 2):cuda()
+    actions = torch.cat(actions, 2)
+    rewards = torch.cat(rewards, 2)
+    terminal = torch.cat(terminal, 2)
     return inp_tensor, actions, rewards, state2, terminal
 end
 
@@ -142,14 +138,22 @@ function select_action(output, chance, legal_power)
     end
 end
 
-function training_step(network, criterion, inputs, targets, learning_rate, iteration, epoch)
+function training_step(network, criterion, inputs, delta, a, learning_rate, iteration, epoch)
     params, gradParams = network:getParameters()
     for i = 1, epoch do
         function feval(params)
             gradParams:zero()
             local outputs = network:forward(inputs)
-            outputs = nn.SoftMax()(outputs)
-            targets = nn.SoftMax()(targets)
+            local targets = torch.zeros(outputs:size(1), outputs:size(2), outputs:size(3)):add(outputs)
+
+            for i = 1, inputs:size(1) do
+                for j = 1, inputs:size(2) do
+                    targets[i][j][a[i][j]] = delta[i][j] 
+                end
+            end
+
+            --outputs = nn.SoftMax()(outputs)
+            --targets = nn.SoftMax()(targets)
             local err = criterion:forward(outputs, targets) --torch.sum(targets) 
             local grad_outputs = criterion:backward(outputs, targets)
             local grad_inputs = network:backward(inputs, grad_outputs)
