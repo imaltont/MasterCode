@@ -28,8 +28,6 @@ The save states inside FCEUX has to be set up in the following pattern:
 - 8: Heat man
 At the beginning of each level.
 
-The testing and training parameters should be updated in both files if changes are made, for the main\_script files. To change the network topology, edit the parameters in the main\_file or for more advanced changes, edit the rnn-rl.lua file.
+To change the network topology, edit the parameters in the main\_file or for more advanced changes, edit the rnn-rl.lua file.
 
-To run the system, first set up the MyCBR rest api server with the desired mycbr project. Then run the emulator and open the game, and finally load one of the four main\_script files as a script in the emulator for either training or testing. 
-
-If you're reading this on github, the pretrained model is not included here because of the size limitation github has on files, but they are included in the zip handed in with the thesis.
+To run the system, first set up the MyCBR rest api server with the desired mycbr project. Then run the emulator and open the game, and finally load the main\_script file as a script in the emulator. Change the testing parameter to enable testing or training, and the cbr parameter to use the CBR section or only a single ANN. 
